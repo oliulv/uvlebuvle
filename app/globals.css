@@ -1,0 +1,103 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #1a1a1a;
+  --christmas-red: #c41e3a;
+  --christmas-green: #228b22;
+  --grey-light: #f5f5f5;
+  --grey-medium: #e5e5e5;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-christmas-red: var(--christmas-red);
+  --color-christmas-green: var(--christmas-green);
+  --color-grey-light: var(--grey-light);
+  --color-grey-medium: var(--grey-medium);
+  --font-pixel: var(--font-pixel);
+  --font-inter: var(--font-inter);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-inter), Arial, Helvetica, sans-serif;
+}
+
+.font-pixel {
+  font-family: var(--font-pixel), monospace;
+}
+
+/* Pixel border utility */
+.pixel-border {
+  box-shadow:
+    0 -4px 0 0 #000,
+    0 4px 0 0 #000,
+    -4px 0 0 0 #000,
+    4px 0 0 0 #000;
+}
+
+.pixel-border-sm {
+  box-shadow:
+    0 -2px 0 0 #000,
+    0 2px 0 0 #000,
+    -2px 0 0 0 #000,
+    2px 0 0 0 #000;
+}
+
+/* Snowflake animation */
+@keyframes snowfall {
+  0% {
+    transform: translateY(-10vh) translateX(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(110vh) translateX(20px);
+    opacity: 0.3;
+  }
+}
+
+.snowflake {
+  position: fixed;
+  color: #c41e3a;
+  font-family: var(--font-pixel), monospace;
+  font-size: 10px;
+  user-select: none;
+  pointer-events: none;
+  z-index: 1000;
+  animation: snowfall linear infinite;
+}
+
+/* Pixel button hover effect */
+.pixel-btn {
+  transition: transform 0.1s ease;
+}
+
+.pixel-btn:hover {
+  transform: translate(2px, 2px);
+}
+
+.pixel-btn:active {
+  transform: translate(4px, 4px);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--grey-light);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--grey-medium);
+  border: 2px solid #000;
+}
+
+/* Input focus styles */
+input:focus {
+  outline: none;
+}
