@@ -1,4 +1,12 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import GameCard from "@/components/GameCard";
+import PlayerSelect, {
+  getStoredPlayer,
+  CurrentPlayerBadge,
+} from "@/components/PlayerSelect";
+import { FamilyMember } from "@/lib/supabase";
 
 const games = [
   {
@@ -46,11 +54,38 @@ const games = [
 ];
 
 export default function GamesHub() {
+  const [currentPlayer, setCurrentPlayer] = useState<FamilyMember | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    setCurrentPlayer(getStoredPlayer());
+    setIsLoading(false);
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="max-w-6xl mx-auto px-4 py-12 text-center">
+        <p className="font-pixel text-xs text-gray-500">LOADING...</p>
+      </div>
+    );
+  }
+
+  if (!currentPlayer) {
+    return <PlayerSelect onSelect={setCurrentPlayer} />;
+  }
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-12">
+      <div className="text-center mb-8">
+        <CurrentPlayerBadge
+          player={currentPlayer}
+          onChangePlayer={() => setCurrentPlayer(null)}
+        />
+      </div>
+
       <div className="text-center mb-12">
         <h1 className="font-pixel text-xl text-christmas-red mb-4">
-          SELECT PLAYER
+          SELECT GAME
         </h1>
         <p className="font-pixel text-xs text-gray-500">
           Choose your game below
