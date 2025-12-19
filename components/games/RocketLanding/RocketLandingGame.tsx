@@ -3,17 +3,27 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 import { useGameLoop } from "./useGameLoop";
 import { useKeyboardControls, useEnterKey } from "./useKeyboardControls";
-import { updatePhysics, checkLanding, calculateScore } from "./gamePhysics";
-import { renderGame } from "./gameRenderer";
+import {
+  updatePhysics,
+  checkLanding,
+  checkSatelliteCollision,
+  updateSatellites,
+  spawnSatellite,
+  calculateScore,
+} from "./gamePhysics";
+import { renderGame, calculateCameraY } from "./gameRenderer";
 import {
   GameState,
   RocketState,
+  Satellite,
   INITIAL_ROCKET_STATE,
-  LAUNCH_STATE,
+  PHYSICS,
 } from "./types";
 import { getStoredPlayer } from "@/components/PlayerSelect";
 
 const GAME_NAME = "rocketLanding";
+const SEPARATION_DURATION = 60;
+const MIN_SEPARATION_ALTITUDE = -200; // Minimum altitude to allow separation
 
 interface RocketLandingGameProps {
   onScoreSubmit?: (score: number) => void;
@@ -22,12 +32,20 @@ interface RocketLandingGameProps {
 export default function RocketLandingGame({ onScoreSubmit }: RocketLandingGameProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [gameState, setGameState] = useState<GameState>("idle");
-  const [rocket, setRocket] = useState<RocketState>(INITIAL_ROCKET_STATE);
   const [countdown, setCountdown] = useState(3);
   const [score, setScore] = useState<number | null>(null);
   const [crashReason, setCrashReason] = useState<string | null>(null);
 
+  // Use refs for frequently updated values to reduce re-renders
+  const rocketRef = useRef<RocketState>(INITIAL_ROCKET_STATE);
+  const cameraYRef = useRef(0);
+  const satellitesRef = useRef<Satellite[]>([]);
+  const separationTimerRef = useRef(0);
+  const canSeparateRef = useRef(false);
+
   const controls = useKeyboardControls();
+  const controlsRef = useRef(controls);
+  controlsRef.current = controls;
 
   // Submit score to API
   const submitScore = useCallback(async (finalScore: number) => {
@@ -50,16 +68,26 @@ export default function RocketLandingGame({ onScoreSubmit }: RocketLandingGamePr
     }
   }, [onScoreSubmit]);
 
+  // Reset game state
+  const resetGame = useCallback(() => {
+    rocketRef.current = { ...INITIAL_ROCKET_STATE };
+    cameraYRef.current = 0;
+    satellitesRef.current = [];
+    separationTimerRef.current = 0;
+    canSeparateRef.current = false;
+    setScore(null);
+    setCrashReason(null);
+  }, []);
+
   // Start game
   const startGame = useCallback(() => {
     if (gameState !== "idle" && gameState !== "success" && gameState !== "crash") {
       return;
     }
 
+    resetGame();
     setGameState("countdown");
     setCountdown(3);
-    setScore(null);
-    setCrashReason(null);
 
     // Countdown timer
     let count = 3;
@@ -69,31 +97,92 @@ export default function RocketLandingGame({ onScoreSubmit }: RocketLandingGamePr
 
       if (count <= 0) {
         clearInterval(interval);
-        // Start flying - rocket appears at top with random velocity
-        setRocket({
-          ...LAUNCH_STATE,
-          x: 30 + Math.random() * 40, // Random x position between 30-70
-          vx: (Math.random() - 0.5) * 2,
-          angle: (Math.random() - 0.5) * 20,
-        });
-        setGameState("flying");
+        // After countdown, go to launching state - player controls thrust
+        setGameState("launching");
       }
     }, 800);
-  }, [gameState]);
+  }, [gameState, resetGame]);
 
   // Handle Enter key
   useEnterKey(startGame, gameState === "idle" || gameState === "success" || gameState === "crash");
 
-  // Game loop
+  // Game loop - using refs to avoid re-render on every frame
   const gameLoop = useCallback(
     (deltaTime: number) => {
-      if (gameState !== "flying") return;
+      const currentGameState = gameState;
 
-      // Update physics
-      const newRocket = updatePhysics(rocket, controls, deltaTime);
+      // Only run physics during active game states
+      if (!["launching", "ascending", "separation", "descending", "landing"].includes(currentGameState)) {
+        return;
+      }
+
+      const rocket = rocketRef.current;
+      const controls = controlsRef.current;
+
+      // Update physics - player controls thrust manually
+      const newRocket = updatePhysics(rocket, controls, deltaTime, false);
+
+      // Update camera to follow rocket
+      cameraYRef.current = calculateCameraY(newRocket.y, cameraYRef.current);
+
+      // Transition from launching to ascending once rocket starts moving up
+      if (currentGameState === "launching" && newRocket.y < INITIAL_ROCKET_STATE.y - 10) {
+        setGameState("ascending");
+      }
+
+      // Check if separation is possible (above minimum altitude)
+      canSeparateRef.current = !newRocket.hasSeparated && newRocket.y <= MIN_SEPARATION_ALTITUDE;
+
+      // Manual separation when player presses S
+      if (
+        canSeparateRef.current &&
+        controls.separate &&
+        currentGameState !== "separation"
+      ) {
+        setGameState("separation");
+        separationTimerRef.current = 0;
+      }
+
+      // Handle separation animation
+      if (currentGameState === "separation") {
+        separationTimerRef.current += deltaTime;
+        if (separationTimerRef.current >= SEPARATION_DURATION) {
+          // Separation complete
+          newRocket.hasSeparated = true;
+          setGameState("descending");
+        }
+      }
+
+      // Spawn satellites (only when high enough and not too many)
+      if (
+        (currentGameState === "descending" || currentGameState === "ascending") &&
+        satellitesRef.current.length < 8
+      ) {
+        const newSatellite = spawnSatellite(newRocket.y);
+        if (newSatellite) {
+          satellitesRef.current = [...satellitesRef.current, newSatellite];
+        }
+      }
+
+      // Update satellites
+      satellitesRef.current = updateSatellites(satellitesRef.current, deltaTime);
+
+      // Check satellite collision (only after separation)
+      if (newRocket.hasSeparated && checkSatelliteCollision(newRocket, satellitesRef.current)) {
+        setCrashReason("HIT SATELLITE");
+        setGameState("crash");
+        rocketRef.current = newRocket;
+        return;
+      }
+
+      // Transition to landing phase when getting close to ground
+      if (newRocket.hasSeparated && newRocket.y > -50 && currentGameState === "descending") {
+        setGameState("landing");
+      }
 
       // Check for landing
-      const landingResult = checkLanding(newRocket);
+      const isDescending = currentGameState === "descending" || currentGameState === "landing";
+      const landingResult = checkLanding(newRocket, isDescending);
 
       if (landingResult !== null) {
         if (landingResult.success) {
@@ -106,22 +195,20 @@ export default function RocketLandingGame({ onScoreSubmit }: RocketLandingGamePr
           setGameState("crash");
         }
         // Stop rocket at ground
-        setRocket({
-          ...newRocket,
-          y: 85,
-          vy: 0,
-          vx: 0,
-        });
-      } else {
-        setRocket(newRocket);
+        newRocket.y = PHYSICS.GROUND_Y - 5;
+        newRocket.vy = 0;
+        newRocket.vx = 0;
       }
+
+      rocketRef.current = newRocket;
     },
-    [gameState, rocket, controls, submitScore]
+    [gameState, submitScore]
   );
 
-  useGameLoop(gameLoop, gameState === "flying");
+  const isGameActive = ["launching", "ascending", "separation", "descending", "landing"].includes(gameState);
+  useGameLoop(gameLoop, isGameActive);
 
-  // Render loop
+  // Render loop - separate from game loop for smoother rendering
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -142,18 +229,30 @@ export default function RocketLandingGame({ onScoreSubmit }: RocketLandingGamePr
     window.addEventListener("resize", updateSize);
 
     // Render
+    let frameId: number;
     const render = () => {
-      renderGame(ctx, rocket, gameState, countdown, score, crashReason);
-      requestAnimationFrame(render);
+      renderGame(
+        ctx,
+        rocketRef.current,
+        gameState,
+        countdown,
+        score,
+        crashReason,
+        cameraYRef.current,
+        satellitesRef.current,
+        separationTimerRef.current,
+        canSeparateRef.current
+      );
+      frameId = requestAnimationFrame(render);
     };
 
-    const frameId = requestAnimationFrame(render);
+    frameId = requestAnimationFrame(render);
 
     return () => {
       window.removeEventListener("resize", updateSize);
       cancelAnimationFrame(frameId);
     };
-  }, [rocket, gameState, countdown, score, crashReason]);
+  }, [gameState, countdown, score, crashReason]);
 
   return (
     <div className="w-full aspect-video bg-white pixel-border relative">

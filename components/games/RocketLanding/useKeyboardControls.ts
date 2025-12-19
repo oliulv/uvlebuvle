@@ -1,12 +1,20 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Controls } from "./types";
 
+export interface ExtendedControls extends Controls {
+  separate: boolean;
+}
+
 export function useKeyboardControls() {
-  const [controls, setControls] = useState<Controls>({
+  const [controls, setControls] = useState<ExtendedControls>({
     left: false,
     right: false,
     thrust: false,
+    separate: false,
   });
+
+  // Use ref to track separate key press (one-shot)
+  const separatePressed = useRef(false);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -27,6 +35,12 @@ export function useKeyboardControls() {
           e.preventDefault();
           setControls((c) => ({ ...c, thrust: true }));
           break;
+        case "KeyS":
+          if (!separatePressed.current) {
+            separatePressed.current = true;
+            setControls((c) => ({ ...c, separate: true }));
+          }
+          break;
       }
     };
 
@@ -44,6 +58,10 @@ export function useKeyboardControls() {
         case "ArrowUp":
         case "KeyW":
           setControls((c) => ({ ...c, thrust: false }));
+          break;
+        case "KeyS":
+          separatePressed.current = false;
+          setControls((c) => ({ ...c, separate: false }));
           break;
       }
     };

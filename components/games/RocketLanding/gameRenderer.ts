@@ -1,19 +1,37 @@
-import { RocketState, GameState, PHYSICS } from "./types";
+import { RocketState, GameState, Satellite, PHYSICS, CAMERA } from "./types";
 
 const COLORS = {
   sky: "#87CEEB",
-  space: "#1a1a2e",
+  space: "#0a0a1a",
   ground: "#228b22",
   pad: "#c41e3a",
   padMarking: "#ffffff",
   rocket: "#ffffff",
   rocketStripe: "#c41e3a",
+  booster: "#888888",
   flame: ["#ff6600", "#ffcc00", "#ffffff"],
   text: "#1a1a1a",
   textLight: "#666666",
   success: "#228b22",
   danger: "#c41e3a",
+  satellite: "#444444",
+  targetLine: "#ffcc00",
 };
+
+// Convert world Y to screen Y based on camera
+function worldToScreenY(worldY: number, cameraY: number, height: number): number {
+  // cameraY is the world Y position that should be at screen center
+  const screenCenterY = height * 0.5;
+  const scale = height / 100; // Scale factor
+  return screenCenterY + (worldY - cameraY) * scale;
+}
+
+// Calculate camera Y position to keep rocket in view
+export function calculateCameraY(rocketY: number, currentCameraY: number): number {
+  // Camera follows rocket with smoothing
+  const targetCameraY = rocketY;
+  return currentCameraY + (targetCameraY - currentCameraY) * CAMERA.SMOOTHING;
+}
 
 export function renderGame(
   ctx: CanvasRenderingContext2D,
@@ -21,36 +39,50 @@ export function renderGame(
   gameState: GameState,
   countdown: number,
   score: number | null,
-  crashReason: string | null
+  crashReason: string | null,
+  cameraY: number,
+  satellites: Satellite[],
+  separationTimer: number,
+  canSeparate: boolean
 ) {
   const { width, height } = ctx.canvas;
 
   // Clear canvas
   ctx.clearRect(0, 0, width, height);
 
-  // Draw background
-  drawBackground(ctx, rocket.y);
+  // Draw background (based on altitude)
+  drawBackground(ctx, rocket.y, cameraY);
 
   // Draw stars if high enough
-  if (rocket.y < 50) {
-    drawStars(ctx, rocket.y);
+  if (rocket.y < -50) {
+    drawStars(ctx, cameraY);
   }
 
+  // Draw target altitude line
+  if (!rocket.hasSeparated) {
+    drawTargetLine(ctx, cameraY, height);
+  }
+
+  // Draw satellites
+  drawSatellites(ctx, satellites, cameraY);
+
   // Draw ground and landing pad
-  drawGround(ctx);
-  drawLandingPad(ctx);
+  drawGround(ctx, cameraY);
+  drawLandingPad(ctx, cameraY);
 
   // Draw rocket
-  drawRocket(ctx, rocket, gameState);
+  drawRocket(ctx, rocket, gameState, cameraY, separationTimer);
 
-  // Draw HUD
-  drawHUD(ctx, rocket);
+  // Draw HUD (fixed on screen, not affected by camera)
+  drawHUD(ctx, rocket, canSeparate);
 
   // Draw state overlays
   if (gameState === "idle") {
     drawStartScreen(ctx);
   } else if (gameState === "countdown") {
     drawCountdown(ctx, countdown);
+  } else if (gameState === "separation") {
+    drawSeparationMessage(ctx);
   } else if (gameState === "success") {
     drawSuccessScreen(ctx, score);
   } else if (gameState === "crash") {
@@ -58,19 +90,24 @@ export function renderGame(
   }
 }
 
-function drawBackground(ctx: CanvasRenderingContext2D, rocketY: number) {
+function drawBackground(ctx: CanvasRenderingContext2D, rocketY: number, cameraY: number) {
   const { width, height } = ctx.canvas;
 
   // Gradient from space to sky based on altitude
-  const skyRatio = Math.min(1, rocketY / 80);
   const gradient = ctx.createLinearGradient(0, 0, 0, height);
 
-  if (skyRatio > 0.5) {
+  // The higher up (more negative Y), the darker
+  const spaceRatio = Math.min(1, Math.max(0, -rocketY / 300));
+
+  if (spaceRatio < 0.3) {
+    // Near ground - blue sky
     gradient.addColorStop(0, COLORS.sky);
     gradient.addColorStop(1, COLORS.sky);
   } else {
+    // In space - dark with gradient
+    const skyColor = lerpColor(COLORS.sky, COLORS.space, spaceRatio);
     gradient.addColorStop(0, COLORS.space);
-    gradient.addColorStop(0.5, lerpColor(COLORS.space, COLORS.sky, skyRatio * 2));
+    gradient.addColorStop(0.7, skyColor);
     gradient.addColorStop(1, COLORS.sky);
   }
 
@@ -78,44 +115,126 @@ function drawBackground(ctx: CanvasRenderingContext2D, rocketY: number) {
   ctx.fillRect(0, 0, width, height);
 }
 
-function drawStars(ctx: CanvasRenderingContext2D, rocketY: number) {
+function drawStars(ctx: CanvasRenderingContext2D, cameraY: number) {
   const { width, height } = ctx.canvas;
-  const starOpacity = Math.max(0, 1 - rocketY / 50);
+  const starOpacity = Math.min(1, Math.max(0, -cameraY / 200));
 
   ctx.fillStyle = `rgba(255, 255, 255, ${starOpacity})`;
 
-  // Fixed star positions
+  // Parallax stars at different layers
   const stars = [
     [0.1, 0.1], [0.3, 0.15], [0.5, 0.08], [0.7, 0.2], [0.9, 0.12],
     [0.15, 0.3], [0.4, 0.25], [0.6, 0.35], [0.85, 0.28],
-    [0.2, 0.45], [0.45, 0.4], [0.75, 0.42],
+    [0.2, 0.5], [0.45, 0.45], [0.75, 0.52], [0.95, 0.4],
+    [0.05, 0.7], [0.35, 0.65], [0.55, 0.75], [0.8, 0.68],
   ];
 
   for (const [sx, sy] of stars) {
+    // Parallax effect - stars move slower than camera
+    const parallaxY = (sy * height + cameraY * 0.1) % height;
     ctx.beginPath();
-    ctx.arc(sx * width, sy * height, 2, 0, Math.PI * 2);
+    ctx.arc(sx * width, parallaxY, 1.5, 0, Math.PI * 2);
     ctx.fill();
   }
 }
 
-function drawGround(ctx: CanvasRenderingContext2D) {
-  const { width, height } = ctx.canvas;
-  const groundY = (PHYSICS.GROUND_Y / 100) * height;
+function drawTargetLine(ctx: CanvasRenderingContext2D, cameraY: number, height: number) {
+  const targetScreenY = worldToScreenY(PHYSICS.TARGET_ALTITUDE, cameraY, height);
 
-  ctx.fillStyle = COLORS.ground;
-  ctx.fillRect(0, groundY, width, height - groundY);
+  // Only draw if on screen
+  if (targetScreenY < -50 || targetScreenY > height + 50) return;
+
+  ctx.strokeStyle = COLORS.targetLine;
+  ctx.lineWidth = 2;
+  ctx.setLineDash([10, 10]);
+  ctx.beginPath();
+  ctx.moveTo(0, targetScreenY);
+  ctx.lineTo(ctx.canvas.width, targetScreenY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Label
+  ctx.font = "bold 10px 'Press Start 2P', monospace";
+  ctx.fillStyle = COLORS.targetLine;
+  ctx.textAlign = "right";
+  ctx.fillText("TARGET ALTITUDE", ctx.canvas.width - 10, targetScreenY - 5);
+  ctx.textAlign = "left";
 }
 
-function drawLandingPad(ctx: CanvasRenderingContext2D) {
+function drawSatellites(
+  ctx: CanvasRenderingContext2D,
+  satellites: Satellite[],
+  cameraY: number
+) {
   const { width, height } = ctx.canvas;
-  const groundY = (PHYSICS.GROUND_Y / 100) * height;
+
+  for (const sat of satellites) {
+    const screenX = (sat.x / 100) * width;
+    const screenY = worldToScreenY(sat.y, cameraY, height);
+
+    // Only draw if on screen
+    if (screenY < -50 || screenY > height + 50) continue;
+
+    const size = sat.size * 3; // Scale for visibility
+
+    if (sat.type === 'satellite') {
+      // Draw satellite body (small box)
+      ctx.fillStyle = COLORS.satellite;
+      ctx.fillRect(screenX - size/2, screenY - size/4, size, size/2);
+
+      // Draw solar panels (lines extending from body)
+      ctx.fillStyle = "#3355aa";
+      ctx.fillRect(screenX - size - 8, screenY - 2, 10, 4);
+      ctx.fillRect(screenX + size/2 - 2, screenY - 2, 10, 4);
+
+      // Panel detail lines
+      ctx.strokeStyle = "#222266";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(screenX - size - 6, screenY - 2);
+      ctx.lineTo(screenX - size - 6, screenY + 2);
+      ctx.moveTo(screenX - size - 3, screenY - 2);
+      ctx.lineTo(screenX - size - 3, screenY + 2);
+      ctx.moveTo(screenX + size/2 + 2, screenY - 2);
+      ctx.lineTo(screenX + size/2 + 2, screenY + 2);
+      ctx.moveTo(screenX + size/2 + 5, screenY - 2);
+      ctx.lineTo(screenX + size/2 + 5, screenY + 2);
+      ctx.stroke();
+    } else {
+      // Draw debris (small irregular shape)
+      ctx.fillStyle = "#666666";
+      ctx.beginPath();
+      ctx.arc(screenX, screenY, size/2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}
+
+function drawGround(ctx: CanvasRenderingContext2D, cameraY: number) {
+  const { width, height } = ctx.canvas;
+  const groundScreenY = worldToScreenY(PHYSICS.GROUND_Y, cameraY, height);
+
+  // Only draw if visible
+  if (groundScreenY > height + 50) return;
+
+  ctx.fillStyle = COLORS.ground;
+  ctx.fillRect(0, groundScreenY, width, height - groundScreenY + 100);
+}
+
+function drawLandingPad(ctx: CanvasRenderingContext2D, cameraY: number) {
+  const { width, height } = ctx.canvas;
+  const groundScreenY = worldToScreenY(PHYSICS.GROUND_Y, cameraY, height);
+
+  // Only draw if visible
+  if (groundScreenY > height + 50) return;
+
   const padStart = (PHYSICS.PAD_X_START / 100) * width;
   const padEnd = (PHYSICS.PAD_X_END / 100) * width;
   const padWidth = padEnd - padStart;
 
   // Pad base
   ctx.fillStyle = COLORS.pad;
-  ctx.fillRect(padStart, groundY - 8, padWidth, 16);
+  ctx.fillRect(padStart, groundScreenY - 8, padWidth, 16);
 
   // Pad markings (X)
   ctx.strokeStyle = COLORS.padMarking;
@@ -123,24 +242,26 @@ function drawLandingPad(ctx: CanvasRenderingContext2D) {
   const centerX = (padStart + padEnd) / 2;
 
   ctx.beginPath();
-  ctx.moveTo(centerX - 15, groundY - 6);
-  ctx.lineTo(centerX + 15, groundY + 6);
-  ctx.moveTo(centerX + 15, groundY - 6);
-  ctx.lineTo(centerX - 15, groundY + 6);
+  ctx.moveTo(centerX - 15, groundScreenY - 6);
+  ctx.lineTo(centerX + 15, groundScreenY + 6);
+  ctx.moveTo(centerX + 15, groundScreenY - 6);
+  ctx.lineTo(centerX - 15, groundScreenY + 6);
   ctx.stroke();
 }
 
 function drawRocket(
   ctx: CanvasRenderingContext2D,
   rocket: RocketState,
-  gameState: GameState
+  gameState: GameState,
+  cameraY: number,
+  separationTimer: number
 ) {
   const { width, height } = ctx.canvas;
-  const x = (rocket.x / 100) * width;
-  const y = (rocket.y / 100) * height;
+  const screenX = (rocket.x / 100) * width;
+  const screenY = worldToScreenY(rocket.y, cameraY, height);
 
   ctx.save();
-  ctx.translate(x, y);
+  ctx.translate(screenX, screenY);
   ctx.rotate((rocket.angle * Math.PI) / 180);
 
   const scale = 1.5;
@@ -148,55 +269,147 @@ function drawRocket(
   if (gameState === "crash") {
     // Draw explosion
     drawExplosion(ctx, scale);
+  } else if (gameState === "separation") {
+    // Draw separation animation
+    drawBooster(ctx, scale, rocket.isThrusting);
+    drawSeparatingTip(ctx, scale, separationTimer);
+  } else if (rocket.hasSeparated) {
+    // Draw just the booster
+    drawBooster(ctx, scale, rocket.isThrusting);
   } else {
-    // Draw flames first (behind rocket)
-    if (rocket.isThrusting) {
-      drawFlames(ctx, scale);
-    }
-
-    // Draw rocket body
-    ctx.fillStyle = COLORS.rocket;
-    ctx.strokeStyle = "#000000";
-    ctx.lineWidth = 2;
-
-    // Nose cone
-    ctx.beginPath();
-    ctx.moveTo(0, -25 * scale);
-    ctx.lineTo(-8 * scale, -10 * scale);
-    ctx.lineTo(8 * scale, -10 * scale);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
-    // Body
-    ctx.fillRect(-8 * scale, -10 * scale, 16 * scale, 30 * scale);
-    ctx.strokeRect(-8 * scale, -10 * scale, 16 * scale, 30 * scale);
-
-    // Red stripe
-    ctx.fillStyle = COLORS.rocketStripe;
-    ctx.fillRect(-8 * scale, 2 * scale, 16 * scale, 8 * scale);
-
-    // Landing legs
-    ctx.strokeStyle = "#333333";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(-6 * scale, 20 * scale);
-    ctx.lineTo(-14 * scale, 30 * scale);
-    ctx.moveTo(6 * scale, 20 * scale);
-    ctx.lineTo(14 * scale, 30 * scale);
-    ctx.stroke();
-
-    // Leg feet
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(-17 * scale, 30 * scale);
-    ctx.lineTo(-11 * scale, 30 * scale);
-    ctx.moveTo(11 * scale, 30 * scale);
-    ctx.lineTo(17 * scale, 30 * scale);
-    ctx.stroke();
+    // Draw full rocket
+    drawFullRocket(ctx, scale, rocket.isThrusting);
   }
 
   ctx.restore();
+}
+
+function drawFullRocket(ctx: CanvasRenderingContext2D, scale: number, isThrusting: boolean) {
+  // Draw flames first (behind rocket)
+  if (isThrusting) {
+    drawFlames(ctx, scale);
+  }
+
+  // Draw rocket body
+  ctx.fillStyle = COLORS.rocket;
+  ctx.strokeStyle = "#000000";
+  ctx.lineWidth = 2;
+
+  // Nose cone
+  ctx.beginPath();
+  ctx.moveTo(0, -30 * scale);
+  ctx.lineTo(-8 * scale, -12 * scale);
+  ctx.lineTo(8 * scale, -12 * scale);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Upper body (payload)
+  ctx.fillStyle = "#dddddd";
+  ctx.fillRect(-8 * scale, -12 * scale, 16 * scale, 12 * scale);
+  ctx.strokeRect(-8 * scale, -12 * scale, 16 * scale, 12 * scale);
+
+  // Lower body (booster)
+  ctx.fillStyle = COLORS.rocket;
+  ctx.fillRect(-8 * scale, 0, 16 * scale, 25 * scale);
+  ctx.strokeRect(-8 * scale, 0, 16 * scale, 25 * scale);
+
+  // Red stripe
+  ctx.fillStyle = COLORS.rocketStripe;
+  ctx.fillRect(-8 * scale, 8 * scale, 16 * scale, 8 * scale);
+
+  // Landing legs
+  drawLandingLegs(ctx, scale);
+}
+
+function drawBooster(ctx: CanvasRenderingContext2D, scale: number, isThrusting: boolean) {
+  // Draw flames first
+  if (isThrusting) {
+    drawFlames(ctx, scale);
+  }
+
+  // Booster body
+  ctx.fillStyle = COLORS.rocket;
+  ctx.strokeStyle = "#000000";
+  ctx.lineWidth = 2;
+
+  // Flat top (where tip was)
+  ctx.fillRect(-8 * scale, -5 * scale, 16 * scale, 30 * scale);
+  ctx.strokeRect(-8 * scale, -5 * scale, 16 * scale, 30 * scale);
+
+  // Red stripe
+  ctx.fillStyle = COLORS.rocketStripe;
+  ctx.fillRect(-8 * scale, 8 * scale, 16 * scale, 8 * scale);
+
+  // Landing legs
+  drawLandingLegs(ctx, scale);
+}
+
+function drawSeparatingTip(ctx: CanvasRenderingContext2D, scale: number, timer: number) {
+  // Tip moves up and slightly to the side during separation
+  const offsetY = -timer * 3;
+  const offsetX = timer * 0.5;
+
+  ctx.save();
+  ctx.translate(offsetX * scale, offsetY * scale);
+
+  // Nose cone
+  ctx.fillStyle = COLORS.rocket;
+  ctx.strokeStyle = "#000000";
+  ctx.lineWidth = 2;
+
+  ctx.beginPath();
+  ctx.moveTo(0, -30 * scale);
+  ctx.lineTo(-8 * scale, -12 * scale);
+  ctx.lineTo(8 * scale, -12 * scale);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Payload section
+  ctx.fillStyle = "#dddddd";
+  ctx.fillRect(-8 * scale, -12 * scale, 16 * scale, 12 * scale);
+  ctx.strokeRect(-8 * scale, -12 * scale, 16 * scale, 12 * scale);
+
+  // Small thrusters on tip
+  if (timer > 5) {
+    ctx.fillStyle = COLORS.flame[1];
+    ctx.beginPath();
+    ctx.moveTo(-6 * scale, 0);
+    ctx.lineTo(-8 * scale, 8 * scale);
+    ctx.lineTo(-4 * scale, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(6 * scale, 0);
+    ctx.lineTo(8 * scale, 8 * scale);
+    ctx.lineTo(4 * scale, 0);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+function drawLandingLegs(ctx: CanvasRenderingContext2D, scale: number) {
+  ctx.strokeStyle = "#333333";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(-6 * scale, 25 * scale);
+  ctx.lineTo(-14 * scale, 35 * scale);
+  ctx.moveTo(6 * scale, 25 * scale);
+  ctx.lineTo(14 * scale, 35 * scale);
+  ctx.stroke();
+
+  // Leg feet
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(-17 * scale, 35 * scale);
+  ctx.lineTo(-11 * scale, 35 * scale);
+  ctx.moveTo(11 * scale, 35 * scale);
+  ctx.lineTo(17 * scale, 35 * scale);
+  ctx.stroke();
 }
 
 function drawFlames(ctx: CanvasRenderingContext2D, scale: number) {
@@ -206,9 +419,9 @@ function drawFlames(ctx: CanvasRenderingContext2D, scale: number) {
     const offset = (i - 1) * 4;
     ctx.fillStyle = COLORS.flame[i % 3];
     ctx.beginPath();
-    ctx.moveTo((-5 + offset) * scale, 20 * scale);
-    ctx.lineTo(offset * scale, (20 + flameHeight) * scale);
-    ctx.lineTo((5 + offset) * scale, 20 * scale);
+    ctx.moveTo((-5 + offset) * scale, 25 * scale);
+    ctx.lineTo(offset * scale, (25 + flameHeight) * scale);
+    ctx.lineTo((5 + offset) * scale, 25 * scale);
     ctx.closePath();
     ctx.fill();
   }
@@ -235,15 +448,15 @@ function drawExplosion(ctx: CanvasRenderingContext2D, scale: number) {
   }
 }
 
-function drawHUD(ctx: CanvasRenderingContext2D, rocket: RocketState) {
+function drawHUD(ctx: CanvasRenderingContext2D, rocket: RocketState, canSeparate: boolean) {
   const { width } = ctx.canvas;
   const padding = 15;
 
-  ctx.font = "bold 12px 'Press Start 2P', monospace";
+  ctx.font = "bold 10px 'Press Start 2P', monospace";
 
   // Fuel gauge
-  const fuelWidth = 120;
-  const fuelHeight = 12;
+  const fuelWidth = 100;
+  const fuelHeight = 10;
   const fuelX = padding;
   const fuelY = padding;
 
@@ -259,29 +472,45 @@ function drawHUD(ctx: CanvasRenderingContext2D, rocket: RocketState) {
   ctx.strokeRect(fuelX, fuelY, fuelWidth, fuelHeight);
 
   ctx.fillStyle = COLORS.text;
-  ctx.fillText(`FUEL ${Math.round(rocket.fuel)}%`, fuelX, fuelY + fuelHeight + 14);
+  ctx.fillText(`FUEL ${Math.round(rocket.fuel)}%`, fuelX, fuelY + fuelHeight + 12);
+
+  // Altitude (negative Y = higher)
+  const altitude = Math.max(0, Math.round(-rocket.y * 10));
+  ctx.textAlign = "right";
+  ctx.fillStyle = COLORS.text;
+  ctx.fillText(`ALT: ${altitude}m`, width - padding, padding + 10);
 
   // Velocity
   const velocity = Math.sqrt(rocket.vx * rocket.vx + rocket.vy * rocket.vy);
   const velColor = velocity <= PHYSICS.MAX_LANDING_VELOCITY ? COLORS.success : COLORS.danger;
-
   ctx.fillStyle = COLORS.text;
-  ctx.textAlign = "right";
-  ctx.fillText(`VEL: `, width - padding - 60, padding + 12);
+  ctx.fillText(`VEL: `, width - padding - 40, padding + 24);
   ctx.fillStyle = velColor;
-  ctx.fillText(`${velocity.toFixed(1)}`, width - padding, padding + 12);
-
-  // Altitude
-  const altitude = Math.max(0, PHYSICS.GROUND_Y - rocket.y);
-  ctx.fillStyle = COLORS.text;
-  ctx.fillText(`ALT: ${Math.round(altitude * 10)}m`, width - padding, padding + 28);
+  ctx.fillText(`${velocity.toFixed(1)}`, width - padding, padding + 24);
 
   // Angle
   const angleColor = Math.abs(rocket.angle) <= PHYSICS.MAX_LANDING_ANGLE ? COLORS.success : COLORS.danger;
   ctx.fillStyle = COLORS.text;
-  ctx.fillText(`ANG: `, width - padding - 50, padding + 44);
+  ctx.fillText(`ANG: `, width - padding - 40, padding + 38);
   ctx.fillStyle = angleColor;
-  ctx.fillText(`${Math.round(rocket.angle)}°`, width - padding, padding + 44);
+  ctx.fillText(`${Math.round(rocket.angle)}°`, width - padding, padding + 38);
+
+  // Mission status
+  ctx.textAlign = "center";
+  if (!rocket.hasSeparated) {
+    if (canSeparate) {
+      // Flashing "PRESS S TO SEPARATE" when can separate
+      const flash = Math.floor(Date.now() / 300) % 2 === 0;
+      ctx.fillStyle = flash ? COLORS.targetLine : "#ffffff";
+      ctx.fillText("PRESS [S] TO SEPARATE!", width / 2, padding + 10);
+    } else {
+      ctx.fillStyle = COLORS.targetLine;
+      ctx.fillText(`REACH 2000m TO SEPARATE`, width / 2, padding + 10);
+    }
+  } else {
+    ctx.fillStyle = COLORS.success;
+    ctx.fillText("LAND THE BOOSTER", width / 2, padding + 10);
+  }
 
   ctx.textAlign = "left";
 }
@@ -292,17 +521,24 @@ function drawStartScreen(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
   ctx.fillRect(0, 0, width, height);
 
-  ctx.font = "bold 16px 'Press Start 2P', monospace";
+  ctx.font = "bold 14px 'Press Start 2P', monospace";
   ctx.fillStyle = "#ffffff";
   ctx.textAlign = "center";
-  ctx.fillText("ROCKET LANDING", width / 2, height / 2 - 30);
+  ctx.fillText("ROCKET LANDING", width / 2, height / 2 - 60);
+
+  ctx.font = "9px 'Press Start 2P', monospace";
+  ctx.fillStyle = COLORS.targetLine;
+  ctx.fillText("MISSION: FLY HIGH, SEPARATE", width / 2, height / 2 - 30);
+  ctx.fillText("& LAND THE BOOSTER", width / 2, height / 2 - 15);
 
   ctx.font = "10px 'Press Start 2P', monospace";
-  ctx.fillText("PRESS ENTER TO LAUNCH", width / 2, height / 2 + 10);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText("PRESS ENTER TO START", width / 2, height / 2 + 20);
 
   ctx.font = "8px 'Press Start 2P', monospace";
   ctx.fillStyle = COLORS.textLight;
-  ctx.fillText("SPACE = THRUST | ARROWS = STEER", width / 2, height / 2 + 40);
+  ctx.fillText("SPACE = THRUST | A/D = STEER", width / 2, height / 2 + 45);
+  ctx.fillText("S = SEPARATE (when high enough)", width / 2, height / 2 + 60);
 
   ctx.textAlign = "left";
 }
@@ -317,8 +553,23 @@ function drawCountdown(ctx: CanvasRenderingContext2D, count: number) {
   ctx.fillStyle = COLORS.danger;
   ctx.textAlign = "center";
 
-  const text = count > 0 ? count.toString() : "GO!";
+  const text = count > 0 ? count.toString() : "LIFTOFF!";
   ctx.fillText(text, width / 2, height / 2);
+
+  ctx.textAlign = "left";
+}
+
+function drawSeparationMessage(ctx: CanvasRenderingContext2D) {
+  const { width, height } = ctx.canvas;
+
+  ctx.font = "bold 16px 'Press Start 2P', monospace";
+  ctx.fillStyle = COLORS.targetLine;
+  ctx.textAlign = "center";
+  ctx.fillText("STAGE SEPARATION!", width / 2, height / 2 - 60);
+
+  ctx.font = "10px 'Press Start 2P', monospace";
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText("LAND THE BOOSTER", width / 2, height / 2 - 35);
 
   ctx.textAlign = "left";
 }
@@ -329,13 +580,13 @@ function drawSuccessScreen(ctx: CanvasRenderingContext2D, score: number | null) 
   ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
   ctx.fillRect(0, 0, width, height);
 
-  ctx.font = "bold 18px 'Press Start 2P', monospace";
+  ctx.font = "bold 16px 'Press Start 2P', monospace";
   ctx.fillStyle = COLORS.success;
   ctx.textAlign = "center";
   ctx.fillText("LANDING SUCCESS!", width / 2, height / 2 - 40);
 
   if (score !== null) {
-    ctx.font = "bold 24px 'Press Start 2P', monospace";
+    ctx.font = "bold 20px 'Press Start 2P', monospace";
     ctx.fillStyle = "#ffffff";
     ctx.fillText(`SCORE: ${score}`, width / 2, height / 2 + 10);
   }
@@ -353,13 +604,13 @@ function drawCrashScreen(ctx: CanvasRenderingContext2D, reason: string | null) {
   ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
   ctx.fillRect(0, 0, width, height);
 
-  ctx.font = "bold 18px 'Press Start 2P', monospace";
+  ctx.font = "bold 16px 'Press Start 2P', monospace";
   ctx.fillStyle = COLORS.danger;
   ctx.textAlign = "center";
   ctx.fillText("MISSION FAILED", width / 2, height / 2 - 40);
 
   if (reason) {
-    ctx.font = "12px 'Press Start 2P', monospace";
+    ctx.font = "11px 'Press Start 2P', monospace";
     ctx.fillStyle = "#ffffff";
     ctx.fillText(reason, width / 2, height / 2);
   }

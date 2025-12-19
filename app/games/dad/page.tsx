@@ -29,9 +29,9 @@ export default function DadGame() {
             CONTROLS
           </p>
           <div className="font-pixel text-xs text-gray-500 space-y-1">
-            <p>SPACE / W / UP = THRUST</p>
-            <p>A / LEFT = TILT LEFT</p>
-            <p>D / RIGHT = TILT RIGHT</p>
+            <p>SPACE / W = THRUST</p>
+            <p>A / D = STEER</p>
+            <p>S = SEPARATE STAGE</p>
             <p>ENTER = START / RESTART</p>
           </div>
         </div>

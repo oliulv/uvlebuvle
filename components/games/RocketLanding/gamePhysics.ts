@@ -1,18 +1,21 @@
-import { RocketState, Controls, LandingResult, PHYSICS } from "./types";
+import { RocketState, Controls, LandingResult, Satellite, PHYSICS } from "./types";
 
 export function updatePhysics(
   rocket: RocketState,
   controls: Controls,
-  deltaTime: number
+  deltaTime: number,
+  autoThrust: boolean = false
 ): RocketState {
-  let { x, y, vx, vy, angle, fuel, isThrusting } = rocket;
+  let { x, y, vx, vy, angle, fuel, isThrusting, hasSeparated, maxAltitude } = rocket;
 
   // Apply gravity
   vy += PHYSICS.GRAVITY * deltaTime;
 
-  // Handle thrust
-  isThrusting = controls.thrust && fuel > 0;
-  if (isThrusting) {
+  // Handle thrust (either from controls or auto-thrust during launch)
+  const shouldThrust = (controls.thrust || autoThrust) && fuel > 0;
+  isThrusting = shouldThrust;
+
+  if (shouldThrust) {
     const angleRad = (angle * Math.PI) / 180;
     vx += Math.sin(angleRad) * PHYSICS.THRUST_POWER * deltaTime;
     vy -= Math.cos(angleRad) * PHYSICS.THRUST_POWER * deltaTime;
@@ -48,12 +51,22 @@ export function updatePhysics(
   // Clamp fuel
   fuel = Math.max(0, fuel);
 
-  return { x, y, vx, vy, angle, fuel, isThrusting };
+  // Track max altitude (y goes negative when higher)
+  if (y < maxAltitude) {
+    maxAltitude = y;
+  }
+
+  return { x, y, vx, vy, angle, fuel, isThrusting, hasSeparated, maxAltitude };
 }
 
-export function checkLanding(rocket: RocketState): LandingResult | null {
-  // Check if rocket has reached ground level
-  if (rocket.y < PHYSICS.GROUND_Y) {
+export function checkLanding(rocket: RocketState, isDescending: boolean): LandingResult | null {
+  // Only check landing when descending (after separation)
+  if (!isDescending) {
+    return null;
+  }
+
+  // Check if rocket has reached ground level (y >= 0 means at or below ground)
+  if (rocket.y < PHYSICS.GROUND_Y - 5) {
     return null; // Still in the air
   }
 
@@ -74,12 +87,70 @@ export function checkLanding(rocket: RocketState): LandingResult | null {
     return { success: false, reason: "BAD ANGLE" };
   }
 
+  // Must have separated before landing
+  if (!rocket.hasSeparated) {
+    return { success: false, reason: "REACH TARGET ALTITUDE FIRST" };
+  }
+
   // Successful landing!
   return { success: true };
 }
 
+export function checkSatelliteCollision(
+  rocket: RocketState,
+  satellites: Satellite[]
+): boolean {
+  const rocketRadius = 6; // Smaller, more accurate collision
+
+  for (const sat of satellites) {
+    // Circle collision - more forgiving
+    const dx = rocket.x - sat.x;
+    const dy = rocket.y - sat.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    const minDistance = rocketRadius + sat.size;
+
+    if (distance < minDistance) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+export function updateSatellites(
+  satellites: Satellite[],
+  deltaTime: number
+): Satellite[] {
+  return satellites.map((sat) => ({
+    ...sat,
+    x: sat.x + sat.speed * deltaTime,
+  })).filter((sat) => sat.x > -20 && sat.x < 120);
+}
+
+export function spawnSatellite(rocketY: number): Satellite | null {
+  // Only spawn satellites at certain altitudes (in space)
+  if (rocketY > -150) return null;
+
+  // Much lower spawn rate
+  if (Math.random() > 0.008) return null;
+
+  const fromLeft = Math.random() > 0.5;
+  const isSatellite = Math.random() > 0.3;
+
+  return {
+    x: fromLeft ? -5 : 105,
+    y: rocketY + (Math.random() - 0.5) * 80,
+    size: isSatellite ? 4 + Math.random() * 3 : 2 + Math.random() * 2,
+    speed: (fromLeft ? 1 : -1) * (0.2 + Math.random() * 0.3),
+    type: isSatellite ? 'satellite' : 'debris',
+  };
+}
+
 export function calculateScore(rocket: RocketState): number {
   const baseScore = 1000;
+
+  // Altitude bonus (how high did they go before separation)
+  const altitudeBonus = Math.round(Math.abs(rocket.maxAltitude) * 0.5);
 
   // Fuel bonus (0-500 points)
   const fuelBonus = Math.round(rocket.fuel * 5);
@@ -92,7 +163,7 @@ export function calculateScore(rocket: RocketState): number {
 
   // Velocity bonus (slower = more points)
   const velocity = Math.sqrt(rocket.vx * rocket.vx + rocket.vy * rocket.vy);
-  const velocityBonus = Math.round((1 - velocity / PHYSICS.MAX_LANDING_VELOCITY) * 200);
+  const velocityBonus = Math.round(Math.max(0, (1 - velocity / PHYSICS.MAX_LANDING_VELOCITY) * 200));
 
-  return baseScore + fuelBonus + accuracyBonus + velocityBonus;
+  return baseScore + altitudeBonus + fuelBonus + accuracyBonus + velocityBonus;
 }
