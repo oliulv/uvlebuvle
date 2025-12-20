@@ -71,13 +71,18 @@ export default function RocketLandingGame({ onScoreSubmit }: RocketLandingGamePr
   // Reset game state
   const resetGame = useCallback(() => {
     rocketRef.current = { ...INITIAL_ROCKET_STATE };
-    cameraYRef.current = 0;
+    // Set camera to match rocket's starting position
+    cameraYRef.current = INITIAL_ROCKET_STATE.y;
     satellitesRef.current = [];
     separationTimerRef.current = 0;
     canSeparateRef.current = false;
+    hasLaunchedRef.current = false;
     setScore(null);
     setCrashReason(null);
   }, []);
+
+  // Track if player has started thrusting (to prevent falling before launch)
+  const hasLaunchedRef = useRef(false);
 
   // Start game
   const startGame = useCallback(() => {
@@ -118,12 +123,28 @@ export default function RocketLandingGame({ onScoreSubmit }: RocketLandingGamePr
 
       const rocket = rocketRef.current;
       const controls = controlsRef.current;
+      const canvas = canvasRef.current;
+
+      // Track if player has started thrusting
+      if (controls.thrust && !hasLaunchedRef.current) {
+        hasLaunchedRef.current = true;
+      }
+
+      // In launching state, don't apply physics until player thrusts
+      // This keeps the rocket on the pad until they press thrust
+      if (currentGameState === "launching" && !hasLaunchedRef.current) {
+        // Just update camera, don't apply physics
+        const height = canvas?.height || 400;
+        cameraYRef.current = calculateCameraY(rocket.y, cameraYRef.current, height);
+        return;
+      }
 
       // Update physics - player controls thrust manually
       const newRocket = updatePhysics(rocket, controls, deltaTime, false);
 
       // Update camera to follow rocket
-      cameraYRef.current = calculateCameraY(newRocket.y, cameraYRef.current);
+      const height = canvas?.height || 400;
+      cameraYRef.current = calculateCameraY(newRocket.y, cameraYRef.current, height);
 
       // Transition from launching to ascending once rocket starts moving up
       if (currentGameState === "launching" && newRocket.y < INITIAL_ROCKET_STATE.y - 10) {

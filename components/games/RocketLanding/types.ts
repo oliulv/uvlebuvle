@@ -73,5 +73,5 @@ export const CAMERA = {
   // Rocket stays between these positions on screen (0-100%)
   MIN_SCREEN_Y: 25,  // Q1 - don't let rocket go above this on screen
   MAX_SCREEN_Y: 75,  // Q3 - don't let rocket go below this on screen
-  SMOOTHING: 0.1,    // How smoothly camera follows
+  SMOOTHING: 0.3,    // How smoothly camera follows (higher = faster)
 } as const;

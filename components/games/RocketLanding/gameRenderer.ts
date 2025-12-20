@@ -26,11 +26,34 @@ function worldToScreenY(worldY: number, cameraY: number, height: number): number
   return screenCenterY + (worldY - cameraY) * scale;
 }
 
-// Calculate camera Y position to keep rocket in view
-export function calculateCameraY(rocketY: number, currentCameraY: number): number {
-  // Camera follows rocket with smoothing
-  const targetCameraY = rocketY;
-  return currentCameraY + (targetCameraY - currentCameraY) * CAMERA.SMOOTHING;
+// Calculate camera Y position to keep rocket in view (Q1-Q3 of viewport)
+export function calculateCameraY(rocketY: number, currentCameraY: number, height: number = 400): number {
+  // Calculate where rocket would appear on screen with current camera
+  const screenCenterY = height * 0.5;
+  const scale = height / 100;
+  const rocketScreenY = screenCenterY + (rocketY - currentCameraY) * scale;
+
+  // Calculate screen bounds (Q1 = 25%, Q3 = 75%)
+  const minScreenY = height * (CAMERA.MIN_SCREEN_Y / 100);
+  const maxScreenY = height * (CAMERA.MAX_SCREEN_Y / 100);
+
+  let targetCameraY = currentCameraY;
+
+  // If rocket is above Q1 (going too high on screen), move camera up
+  if (rocketScreenY < minScreenY) {
+    // Calculate what cameraY should be to put rocket at Q1
+    targetCameraY = rocketY - (minScreenY - screenCenterY) / scale;
+  }
+  // If rocket is below Q3 (going too low on screen), move camera down
+  else if (rocketScreenY > maxScreenY) {
+    // Calculate what cameraY should be to put rocket at Q3
+    targetCameraY = rocketY - (maxScreenY - screenCenterY) / scale;
+  }
+
+  // Apply smoothing (but faster when difference is large)
+  const diff = targetCameraY - currentCameraY;
+  const smoothing = Math.min(0.8, CAMERA.SMOOTHING + Math.abs(diff) * 0.01);
+  return currentCameraY + diff * smoothing;
 }
 
 export function renderGame(
@@ -449,7 +472,7 @@ function drawExplosion(ctx: CanvasRenderingContext2D, scale: number) {
 }
 
 function drawHUD(ctx: CanvasRenderingContext2D, rocket: RocketState, canSeparate: boolean) {
-  const { width } = ctx.canvas;
+  const { width, height } = ctx.canvas;
   const padding = 15;
 
   ctx.font = "bold 10px 'Press Start 2P', monospace";
@@ -495,7 +518,57 @@ function drawHUD(ctx: CanvasRenderingContext2D, rocket: RocketState, canSeparate
   ctx.fillStyle = angleColor;
   ctx.fillText(`${Math.round(rocket.angle)}°`, width - padding, padding + 38);
 
+  // ===== ALTITUDE BAR (left side) =====
+  const barX = padding;
+  const barY = padding + 50;
+  const barWidth = 12;
+  const barHeight = height - 100;
+  const targetAltitude = Math.abs(PHYSICS.TARGET_ALTITUDE * 10); // 4000m
+  const maxAltitudeDisplay = 5000; // Show up to 5000m on bar
+
+  // Bar background
+  ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
+  ctx.fillRect(barX, barY, barWidth, barHeight);
+
+  // Current altitude fill (from bottom)
+  const altitudeRatio = Math.min(1, altitude / maxAltitudeDisplay);
+  const fillHeight = altitudeRatio * barHeight;
+
+  // Gradient: green at bottom, yellow in middle, red at top
+  const gradient = ctx.createLinearGradient(0, barY + barHeight, 0, barY);
+  gradient.addColorStop(0, COLORS.success);
+  gradient.addColorStop(0.4, COLORS.targetLine);
+  gradient.addColorStop(1, COLORS.danger);
+
+  ctx.fillStyle = gradient;
+  ctx.fillRect(barX, barY + barHeight - fillHeight, barWidth, fillHeight);
+
+  // Bar border
+  ctx.strokeStyle = "#000";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(barX, barY, barWidth, barHeight);
+
+  // Target altitude marker
+  const targetRatio = targetAltitude / maxAltitudeDisplay;
+  const targetY = barY + barHeight - (targetRatio * barHeight);
+
+  ctx.fillStyle = COLORS.targetLine;
+  ctx.beginPath();
+  ctx.moveTo(barX + barWidth, targetY);
+  ctx.lineTo(barX + barWidth + 8, targetY - 4);
+  ctx.lineTo(barX + barWidth + 8, targetY + 4);
+  ctx.closePath();
+  ctx.fill();
+
+  // Altitude labels
+  ctx.font = "6px 'Press Start 2P', monospace";
+  ctx.fillStyle = COLORS.text;
+  ctx.textAlign = "left";
+  ctx.fillText("5K", barX + barWidth + 4, barY + 6);
+  ctx.fillText("0", barX + barWidth + 4, barY + barHeight);
+
   // Mission status
+  ctx.font = "bold 10px 'Press Start 2P', monospace";
   ctx.textAlign = "center";
   if (!rocket.hasSeparated) {
     if (canSeparate) {
