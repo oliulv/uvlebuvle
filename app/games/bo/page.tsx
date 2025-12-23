@@ -1,40 +1,53 @@
+"use client";
+
+import { useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import PixelButton from "@/components/PixelButton";
+import Leaderboard from "@/components/Leaderboard";
+
+const PixelHoopsGame = dynamic(
+  () => import("@/components/games/PixelHoops/PixelHoopsGame"),
+  { ssr: false }
+);
 
 export default function BoGame() {
+  const [leaderboardKey, setLeaderboardKey] = useState(0);
+
+  const handleScoreSubmit = () => {
+    setLeaderboardKey((k) => k + 1);
+  };
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-4">
       <div className="text-center mb-3">
         <p className="font-pixel text-xs text-christmas-green mb-1">BO</p>
-        <h1 className="font-pixel text-xl text-foreground">HOOPS</h1>
+        <h1 className="font-pixel text-xl text-foreground">PIXEL HOOPS</h1>
       </div>
 
-      {/* Game canvas placeholder */}
-      <div className="bg-white pixel-border aspect-video flex items-center justify-center mb-3">
-        <div className="text-center">
-          <div className="font-pixel text-4xl mb-4 text-gray-300">(O)</div>
-          <p className="font-pixel text-xs text-gray-400">GAME LOADING...</p>
-          <p className="font-pixel text-xs text-christmas-red mt-2">
-            COMING SOON
+      <PixelHoopsGame onScoreSubmit={handleScoreSubmit} />
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        <div className="bg-grey-light pixel-border-sm p-3">
+          <p className="font-pixel text-xs text-gray-600 text-center mb-2">
+            HOW TO PLAY
           </p>
+          <div className="font-pixel text-xs text-gray-500 space-y-1">
+            <p>A/D or ARROWS: Move</p>
+            <p>SPACE: Jump / Start</p>
+            <p>X or DOWN: Hold to charge shot</p>
+            <p>GREEN zone = perfect power!</p>
+            <p>3PT shots from far away</p>
+            <p>SWISH/BANK = bonus points</p>
+          </div>
+        </div>
+
+        <div className="bg-grey-light pixel-border-sm p-3">
+          <Leaderboard game="pixel-hoops" refreshKey={leaderboardKey} />
         </div>
       </div>
 
-      {/* Score display */}
-      <div className="bg-grey-light pixel-border-sm p-3 mb-3">
-        <div className="flex justify-center gap-8 font-pixel text-xs">
-          <div className="text-center">
-            <p className="text-gray-500">SCORE</p>
-            <p className="text-xl text-foreground">0</p>
-          </div>
-          <div className="text-center">
-            <p className="text-gray-500">HIGH SCORE</p>
-            <p className="text-xl text-christmas-green">---</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="text-center">
+      <div className="text-center mt-4">
         <Link href="/games">
           <PixelButton variant="secondary">&lt; BACK</PixelButton>
         </Link>
