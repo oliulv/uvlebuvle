@@ -46,9 +46,9 @@ const games = [
   },
   {
     name: "TORVALD",
-    title: "TUG OF WAR",
-    description: "Dog-themed tug of war game",
-    icon: "^.^",
+    title: "MEMORY",
+    description: "Match pairs vs Gemini AI",
+    icon: "[?]",
     href: "/games/torvald",
   },
 ];
