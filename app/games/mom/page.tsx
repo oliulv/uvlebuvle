@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import PixelButton from "@/components/PixelButton";
 import Leaderboard from "@/components/Leaderboard";
+import { getStoredPlayer } from "@/components/PlayerSelect";
 
 const SudokuGame = dynamic(
   () => import("@/components/games/Sudoku/SudokuGame"),
@@ -13,6 +14,7 @@ const SudokuGame = dynamic(
 
 export default function MomGame() {
   const [leaderboardKey, setLeaderboardKey] = useState(0);
+  const player = getStoredPlayer();
 
   const handleScoreSubmit = () => {
     setLeaderboardKey((k) => k + 1);
@@ -21,7 +23,9 @@ export default function MomGame() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-4">
       <div className="text-center mb-3">
-        <p className="font-pixel text-xs text-christmas-green mb-1">MOM</p>
+        <p className="font-pixel text-xs text-christmas-green mb-1">
+          {player?.toUpperCase() || "PLAYER"}
+        </p>
         <h1 className="font-pixel text-xl text-foreground">SUDOKU</h1>
       </div>
 

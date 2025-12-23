@@ -9,6 +9,7 @@ import PixelButton from '@/components/PixelButton';
 
 interface PokerGameProps {
   isFullscreen?: boolean;
+  onScoreSubmit?: (score: number) => void;
 }
 
 // Action log entry with optional reasoning
@@ -21,7 +22,9 @@ interface ActionLogEntry {
   phase?: GamePhase;
 }
 
-export default function PokerGame({ isFullscreen = false }: PokerGameProps) {
+const STARTING_CHIPS = 1000;
+
+export default function PokerGame({ isFullscreen = false, onScoreSubmit }: PokerGameProps) {
   const [gameState, dispatch] = useReducer(gameReducer, createInitialState());
   const [thinkingPlayerId, setThinkingPlayerId] = useState<string | null>(null);
   const [actionLog, setActionLog] = useState<ActionLogEntry[]>([]);
@@ -33,6 +36,7 @@ export default function PokerGame({ isFullscreen = false }: PokerGameProps) {
   const [expandedLogId, setExpandedLogId] = useState<number | null>(null);
   const [logIdCounter, setLogIdCounter] = useState(0);
   const lastRecordedHand = useRef<number>(0);
+  const [scoreSubmitted, setScoreSubmitted] = useState(false);
 
   const currentPlayer = gameState.players[gameState.currentPlayerIndex];
   const isHumanTurn = currentPlayer?.type === 'human' &&
@@ -285,6 +289,39 @@ export default function PokerGame({ isFullscreen = false }: PokerGameProps) {
     }
   }, [gameState.phase, gameState.handNumber, gameState.winner, gameState.winningHand, gameState.pot, recordHandCompletion]);
 
+  // Submit score when game ends (human wins or loses)
+  useEffect(() => {
+    if (gameOver && gameWinner && !scoreSubmitted) {
+      const humanPlayer = gameState.players.find(p => p.type === 'human');
+      if (humanPlayer) {
+        const chipGain = humanPlayer.chips - STARTING_CHIPS;
+        // Only submit score if human won chips
+        if (chipGain > 0) {
+          const submitScore = async () => {
+            try {
+              const response = await fetch('/api/scores', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  game: 'poker',
+                  score: chipGain,
+                  player: localStorage.getItem('currentPlayer') || 'Unknown',
+                }),
+              });
+              if (response.ok) {
+                setScoreSubmitted(true);
+                onScoreSubmit?.(chipGain);
+              }
+            } catch (error) {
+              console.error('Failed to submit poker score:', error);
+            }
+          };
+          submitScore();
+        }
+      }
+    }
+  }, [gameOver, gameWinner, scoreSubmitted, gameState.players, onScoreSubmit]);
+
   // Handle human action
   const handleHumanAction = (action: BettingAction, amount?: number) => {
     if (!isHumanTurn) return;
@@ -345,6 +382,7 @@ export default function PokerGame({ isFullscreen = false }: PokerGameProps) {
     setActionLog([]);
     setGameHistory({ hands: [], playerStats: {} });
     setCurrentHandActions([]);
+    setScoreSubmitted(false);
     dispatch({ type: 'RESET_GAME' });
   };
 

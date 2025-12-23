@@ -1,11 +1,18 @@
+"use client";
+
 import Link from "next/link";
 import PixelButton from "@/components/PixelButton";
+import { getStoredPlayer } from "@/components/PlayerSelect";
 
 export default function OliverGame() {
+  const player = getStoredPlayer();
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-4">
       <div className="text-center mb-3">
-        <p className="font-pixel text-xs text-christmas-green mb-1">OLIVER</p>
+        <p className="font-pixel text-xs text-christmas-green mb-1">
+          {player?.toUpperCase() || "PLAYER"}
+        </p>
         <h1 className="font-pixel text-xl text-foreground">CODE QUEST</h1>
       </div>
 
