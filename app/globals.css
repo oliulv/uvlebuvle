@@ -153,3 +153,83 @@ input:focus {
   min-width: var(--cell-size);
   min-height: var(--cell-size);
 }
+
+/* Pixel Hoops game styles */
+.pixel-hoops-game {
+  --court-width: 800px;
+  --court-height: 600px;
+}
+
+.pixel-hoops-game canvas {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* Score popup animation */
+@keyframes scorePopup {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-50px) scale(1.5);
+    opacity: 0;
+  }
+}
+
+.score-popup {
+  animation: scorePopup 1s ease-out forwards;
+}
+
+/* Memory card 3D flip utilities */
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.transform-style-3d {
+  transform-style: preserve-3d;
+}
+
+.backface-hidden {
+  backface-visibility: hidden;
+}
+
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}
+
+/* Memory game - full width/height layout for 6x4 grid */
+.memory-game {
+  max-width: 100%;
+  width: 100%;
+  height: 100%;
+}
+
+/* Zoom modal animations */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes zoom-in {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+.animate-zoom-in {
+  animation: zoom-in 0.3s ease-out;
+}
