@@ -6,6 +6,9 @@ import PlayerSelect, {
   getStoredPlayer,
   CurrentPlayerBadge,
 } from "@/components/PlayerSelect";
+import GlobalLeaderboard from "@/components/GlobalLeaderboard";
+import InfoButton from "@/components/InfoButton";
+import InfoModal from "@/components/InfoModal";
 import { FamilyMember } from "@/lib/supabase";
 
 const games = [
@@ -56,6 +59,7 @@ const games = [
 export default function GamesHub() {
   const [currentPlayer, setCurrentPlayer] = useState<FamilyMember | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showInfoModal, setShowInfoModal] = useState(false);
 
   useEffect(() => {
     setCurrentPlayer(getStoredPlayer());
@@ -76,11 +80,12 @@ export default function GamesHub() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-12">
-      <div className="text-center mb-8">
+      <div className="flex justify-between items-center mb-8">
         <CurrentPlayerBadge
           player={currentPlayer}
           onChangePlayer={() => setCurrentPlayer(null)}
         />
+        <InfoButton onClick={() => setShowInfoModal(true)} />
       </div>
 
       <div className="text-center mb-12">
@@ -98,11 +103,22 @@ export default function GamesHub() {
         ))}
       </div>
 
+      <div className="mt-12 max-w-md mx-auto">
+        <div className="bg-white pixel-border p-4">
+          <h2 className="font-pixel text-sm text-christmas-green text-center mb-4">
+            FAMILY LEADERBOARD
+          </h2>
+          <GlobalLeaderboard />
+        </div>
+      </div>
+
       <div className="text-center mt-12">
         <p className="font-pixel text-xs text-christmas-green">
           * * * MERRY CHRISTMAS * * *
         </p>
       </div>
+
+      <InfoModal isOpen={showInfoModal} onClose={() => setShowInfoModal(false)} />
     </div>
   );
 }
