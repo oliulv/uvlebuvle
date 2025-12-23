@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase, Score, FAMILY_MEMBERS, FamilyMember, isSupabaseConfigured } from "@/lib/supabase";
+import { calculateNormalizedPoints, GameType } from "@/lib/scoring";
 
 export async function GET(request: NextRequest) {
   if (!isSupabaseConfigured) {
@@ -59,6 +60,23 @@ export async function POST(request: NextRequest) {
   if (error) {
     console.error("Supabase error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Calculate and save normalized points for global leaderboard
+  const normalized = calculateNormalizedPoints(game as GameType, score);
+  const { error: normalizedError } = await supabase
+    .from("normalized_points")
+    .insert([{
+      player,
+      game,
+      base_points: normalized.base,
+      bonus_points: normalized.bonus,
+      score_id: data.id,
+    }]);
+
+  if (normalizedError) {
+    console.error("Normalized points error:", normalizedError);
+    // Don't fail the request, score was saved successfully
   }
 
   return NextResponse.json(data);
