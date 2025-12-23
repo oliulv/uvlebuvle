@@ -28,6 +28,11 @@ export default function PasscodeEntry() {
     if (e.key === "Backspace" && !digits[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
     }
+    // Submit on Enter if all digits are filled
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSubmit();
+    }
   };
 
   const handleSubmit = async () => {
