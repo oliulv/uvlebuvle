@@ -127,3 +127,29 @@ input:focus {
   width: var(--card-width);
   height: var(--card-height);
 }
+
+/* Sudoku game styles */
+.sudoku-game {
+  --cell-size: 36px;
+}
+
+@media (min-width: 480px) {
+  .sudoku-game {
+    --cell-size: 42px;
+  }
+}
+
+@media (min-width: 640px) {
+  .sudoku-game {
+    --cell-size: 44px;
+  }
+}
+
+.sudoku-board {
+  touch-action: manipulation;
+}
+
+.sudoku-cell {
+  min-width: var(--cell-size);
+  min-height: var(--cell-size);
+}
