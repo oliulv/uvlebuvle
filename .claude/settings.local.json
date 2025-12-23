@@ -10,7 +10,10 @@
       "Bash(pkill:*)",
       "Bash(bun run dev)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(find:*)",
+      "Bash(bun dev)",
+      "Bash(bun i:*)"
     ],
     "deny": [],
     "ask": []
