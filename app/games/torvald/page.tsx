@@ -1,41 +1,38 @@
+"use client";
+
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import PixelButton from "@/components/PixelButton";
 
+const MemoryGame = dynamic(
+  () => import("@/components/games/Memory/MemoryGame"),
+  { ssr: false }
+);
+
 export default function TorvaldGame() {
+
   return (
-    <div className="max-w-4xl mx-auto px-4 py-4">
-      <div className="text-center mb-3">
-        <p className="font-pixel text-xs text-christmas-green mb-1">TORVALD</p>
-        <h1 className="font-pixel text-xl text-foreground">TUG OF WAR</h1>
+    <div className="w-full h-[100dvh] flex flex-col px-2 sm:px-3 py-1 overflow-hidden">
+      {/* Header - compact */}
+      <div className="text-center shrink-0">
+        <p className="font-pixel text-[10px] text-christmas-green">TORVALD</p>
+        <h1 className="font-pixel text-sm sm:text-base text-foreground">MEMORY</h1>
       </div>
 
-      {/* Game canvas placeholder */}
-      <div className="bg-white pixel-border aspect-video flex items-center justify-center mb-3">
-        <div className="text-center">
-          <div className="font-pixel text-4xl mb-4 text-gray-300">^.^</div>
-          <p className="font-pixel text-xs text-gray-400">GAME LOADING...</p>
-          <p className="font-pixel text-xs text-christmas-red mt-2">
-            COMING SOON
-          </p>
-        </div>
+      {/* Game takes remaining space */}
+      <div className="flex-1 min-h-0 my-1">
+        <MemoryGame />
       </div>
 
-      {/* Game info */}
-      <div className="bg-grey-light pixel-border-sm p-3 mb-3">
-        <p className="font-pixel text-xs text-gray-600 text-center">
-          TAP OR CLICK RAPIDLY TO PULL THE ROPE!
-        </p>
-        <div className="flex justify-center items-center gap-4 mt-2 font-pixel text-sm">
-          <span className="text-christmas-green">WOOF!</span>
-          <span className="text-gray-400">----====----</span>
-          <span className="text-christmas-red">RUFF!</span>
-        </div>
-      </div>
-
-      <div className="text-center">
+      {/* Footer - compact */}
+      <div className="shrink-0 flex items-center justify-center gap-4 py-1">
         <Link href="/games">
-          <PixelButton variant="secondary">&lt; BACK</PixelButton>
+          <PixelButton variant="secondary" className="text-[10px] px-2 py-0.5">&lt; BACK</PixelButton>
         </Link>
+
+        <span className="font-pixel text-[8px] text-gray-500">
+          CLICK TO FLIP • MATCH PAIRS • TAP TO ZOOM
+        </span>
       </div>
     </div>
   );
