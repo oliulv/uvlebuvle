@@ -21,7 +21,7 @@ export default function Home() {
             FAMILY GAMES
           </h1>
           <p className="font-pixel text-xs text-gray-500 mb-2">
-            CHRISTMAS 2024
+            CHRISTMAS 2025
           </p>
           <div className="w-32 h-1 bg-christmas-green mx-auto mb-8" />
           <p className="font-pixel text-xs text-gray-600 mb-8">

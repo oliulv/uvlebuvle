@@ -19,7 +19,7 @@ export default function GamesLayout({
             FAMILY GAMES
           </Link>
           <nav className="font-pixel text-xs text-gray-500">
-            <span className="text-christmas-green">*</span> CHRISTMAS 2024{" "}
+            <span className="text-christmas-green">*</span> CHRISTMAS 2025{" "}
             <span className="text-christmas-green">*</span>
           </nav>
         </div>
