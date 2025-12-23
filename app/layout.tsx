@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Press_Start_2P, Inter } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 const pressStart = Press_Start_2P({
@@ -27,6 +28,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${pressStart.variable} ${inter.variable} antialiased`}>
         {children}
+        <Analytics />
       </body>
     </html>
   );
