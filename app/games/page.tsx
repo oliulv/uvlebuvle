@@ -11,9 +11,9 @@ import { FamilyMember } from "@/lib/supabase";
 const games = [
   {
     name: "DAD",
-    title: "ROCKET LAUNCH",
-    description: "SpaceX-inspired rocketship game",
-    icon: "[=]>",
+    title: "SOLITAIRE",
+    description: "Classic Klondike card game",
+    icon: "♠♥",
     href: "/games/dad",
   },
   {

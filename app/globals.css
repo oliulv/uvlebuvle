@@ -101,3 +101,29 @@ body {
 input:focus {
   outline: none;
 }
+
+/* Solitaire card sizing - uses CSS custom properties for scaling */
+.solitaire-game {
+  --card-width: 70px;
+  --card-height: 98px;
+  --card-gap: 10px;
+  --pile-gap: 16px;
+  --face-down-offset: 4px;
+  --face-up-offset: 22px;
+  font-size: 14px;
+}
+
+.solitaire-game.fullscreen {
+  --card-width: 110px;
+  --card-height: 154px;
+  --card-gap: 14px;
+  --pile-gap: 28px;
+  --face-down-offset: 7px;
+  --face-up-offset: 34px;
+  font-size: 22px;
+}
+
+.card-size {
+  width: var(--card-width);
+  height: var(--card-height);
+}
