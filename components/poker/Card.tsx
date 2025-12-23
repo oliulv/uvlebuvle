@@ -16,9 +16,9 @@ const suitSymbols: Record<string, string> = {
 
 export default function Card({ card, faceDown = false, size = 'md' }: CardProps) {
   const sizeClasses = {
-    sm: 'w-8 h-12 text-[8px]',
-    md: 'w-12 h-16 text-xs',
-    lg: 'w-16 h-24 text-sm',
+    sm: 'w-10 h-14 text-[10px]',
+    md: 'w-14 h-20 text-sm',
+    lg: 'w-20 h-28 text-base',
   };
 
   if (faceDown || !card) {

@@ -7,9 +7,10 @@ import { CardHand } from './Card';
 interface PokerTableProps {
   gameState: GameState;
   thinkingPlayerId: string | null;
+  isFullscreen?: boolean;
 }
 
-export default function PokerTable({ gameState, thinkingPlayerId }: PokerTableProps) {
+export default function PokerTable({ gameState, thinkingPlayerId, isFullscreen = false }: PokerTableProps) {
   const { players, communityCards, pot, phase, currentPlayerIndex, winner, winningHand } = gameState;
 
   // Find players by position
@@ -21,97 +22,119 @@ export default function PokerTable({ gameState, thinkingPlayerId }: PokerTablePr
   const showdown = phase === 'showdown' || phase === 'hand-complete';
 
   return (
-    <div className="w-full max-w-3xl mx-auto">
-      {/* Top player */}
-      <div className="flex justify-center mb-2">
-        {topPlayer && (
-          <PlayerSeat
-            player={topPlayer}
-            isCurrentTurn={players[currentPlayerIndex]?.id === topPlayer.id}
-            isThinking={thinkingPlayerId === topPlayer.id}
-            showCards={showdown}
-            phase={phase}
+    <div className="w-full h-full flex items-center justify-center">
+      {/* Table container with relative positioning for player placement */}
+      <div className={`relative w-full ${isFullscreen ? 'max-w-5xl' : 'max-w-4xl'}`}>
+        {/* The oval table */}
+        <div
+          className="w-full bg-gradient-to-b from-emerald-600 to-emerald-700 rounded-[50%] relative overflow-hidden"
+          style={{
+            aspectRatio: isFullscreen ? '2.8/1' : '2.5/1',
+            boxShadow: 'inset 0 0 60px rgba(0,0,0,0.3), 0 8px 32px rgba(0,0,0,0.4)'
+          }}
+        >
+          {/* Inner felt border */}
+          <div
+            className="absolute inset-4 rounded-[50%] border-4 border-emerald-800/40"
           />
-        )}
-      </div>
 
-      {/* Middle row: Left player - Table - Right player */}
-      <div className="flex items-center gap-2">
-        {/* Left player */}
-        <div className="flex-shrink-0">
-          {leftPlayer && (
-            <PlayerSeat
-              player={leftPlayer}
-              isCurrentTurn={players[currentPlayerIndex]?.id === leftPlayer.id}
-              isThinking={thinkingPlayerId === leftPlayer.id}
-              showCards={showdown}
-              phase={phase}
-            />
-          )}
-        </div>
+          {/* Rail/edge effect */}
+          <div
+            className="absolute inset-0 rounded-[50%]"
+            style={{
+              boxShadow: 'inset 0 0 0 8px rgba(139,69,19,0.6), inset 0 0 0 12px rgba(101,67,33,0.4)'
+            }}
+          />
 
-        {/* Table felt */}
-        <div className="flex-1 bg-christmas-green pixel-border rounded-3xl aspect-[3/1] relative overflow-hidden">
-          {/* Inner border */}
-          <div className="absolute inset-3 rounded-2xl border-2 border-green-900 opacity-30" />
-
-          {/* Center area - community cards and pot */}
+          {/* Center content */}
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
             {/* Pot */}
             {pot > 0 && (
-              <div className="font-pixel text-white text-xs bg-black/30 px-2 py-1 pixel-border-sm">
+              <div className={`font-pixel text-white ${isFullscreen ? 'text-sm' : 'text-xs'} bg-black/40 px-3 py-1.5 rounded-full`}>
                 POT: ${pot}
               </div>
             )}
 
             {/* Community cards */}
             {communityCards.length > 0 && (
-              <div className="bg-black/20 p-1 rounded">
-                <CardHand cards={communityCards} size="sm" />
+              <div className="bg-black/20 p-2 rounded-lg">
+                <CardHand cards={communityCards} size={isFullscreen ? 'md' : 'sm'} />
               </div>
             )}
 
             {/* Winner announcement */}
             {phase === 'hand-complete' && winner && (
-              <div className="font-pixel text-white text-center bg-black/50 px-3 py-1 pixel-border-sm">
-                <div className="text-christmas-red text-xs">{winner.name} WINS!</div>
-                <div className="text-[10px] mt-1">{winningHand}</div>
+              <div className="font-pixel text-white text-center bg-black/50 px-4 py-2 rounded-lg">
+                <div className={`text-yellow-400 ${isFullscreen ? 'text-sm' : 'text-xs'}`}>{winner.name} WINS!</div>
+                <div className="text-[10px] text-white/80 mt-1">{winningHand}</div>
               </div>
             )}
 
             {/* Phase indicator */}
             {phase !== 'waiting' && phase !== 'hand-complete' && (
-              <div className="font-pixel text-white/70 text-[10px]">
+              <div className="font-pixel text-white/60 text-[10px]">
                 {phase.toUpperCase().replace('-', ' ')}
               </div>
             )}
           </div>
         </div>
 
+        {/* Player positions - absolutely positioned around the table */}
+
+        {/* Top player */}
+        {topPlayer && (
+          <div className="absolute left-1/2 -translate-x-1/2 -top-2 -translate-y-1/2">
+            <PlayerSeat
+              player={topPlayer}
+              isCurrentTurn={players[currentPlayerIndex]?.id === topPlayer.id}
+              isThinking={thinkingPlayerId === topPlayer.id}
+              showCards={showdown}
+              phase={phase}
+              position="top"
+            />
+          </div>
+        )}
+
+        {/* Left player */}
+        {leftPlayer && (
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/4">
+            <PlayerSeat
+              player={leftPlayer}
+              isCurrentTurn={players[currentPlayerIndex]?.id === leftPlayer.id}
+              isThinking={thinkingPlayerId === leftPlayer.id}
+              showCards={showdown}
+              phase={phase}
+              position="left"
+            />
+          </div>
+        )}
+
         {/* Right player */}
-        <div className="flex-shrink-0">
-          {rightPlayer && (
+        {rightPlayer && (
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/4">
             <PlayerSeat
               player={rightPlayer}
               isCurrentTurn={players[currentPlayerIndex]?.id === rightPlayer.id}
               isThinking={thinkingPlayerId === rightPlayer.id}
               showCards={showdown}
               phase={phase}
+              position="right"
             />
-          )}
-        </div>
-      </div>
+          </div>
+        )}
 
-      {/* Bottom player (human) */}
-      <div className="flex justify-center mt-2">
+        {/* Bottom player (human) */}
         {bottomPlayer && (
-          <PlayerSeat
-            player={bottomPlayer}
-            isCurrentTurn={players[currentPlayerIndex]?.id === bottomPlayer.id}
-            isThinking={thinkingPlayerId === bottomPlayer.id}
-            showCards={true}
-            phase={phase}
-          />
+          <div className="absolute left-1/2 -translate-x-1/2 -bottom-2 translate-y-1/2">
+            <PlayerSeat
+              player={bottomPlayer}
+              isCurrentTurn={players[currentPlayerIndex]?.id === bottomPlayer.id}
+              isThinking={thinkingPlayerId === bottomPlayer.id}
+              showCards={true}
+              phase={phase}
+              position="bottom"
+            />
+          </div>
         )}
       </div>
     </div>
