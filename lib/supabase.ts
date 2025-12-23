@@ -1,14 +1,17 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseKey =
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 // Create a dummy client if env vars are missing (for build time)
-export const supabase: SupabaseClient = supabaseUrl && supabaseAnonKey
-  ? createClient(supabaseUrl, supabaseAnonKey)
-  : createClient("https://placeholder.supabase.co", "placeholder-key");
+export const supabase: SupabaseClient =
+  supabaseUrl && supabaseKey
+    ? createClient(supabaseUrl, supabaseKey)
+    : createClient("https://placeholder.supabase.co", "placeholder-key");
 
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseKey);
 
 export interface Score {
   id?: number;
