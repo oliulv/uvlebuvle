@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { COOKIE_NAME, COOKIE_VALUE } from "@/lib/auth";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const authCookie = request.cookies.get(COOKIE_NAME);
 
   if (authCookie?.value !== COOKIE_VALUE) {
@@ -13,5 +13,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: "/games/:path*",
+  matcher: ["/games", "/games/:path*"],
 };
