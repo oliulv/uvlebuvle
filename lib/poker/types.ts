@@ -107,6 +107,39 @@ export interface AIDecision {
   reasoning: string;
 }
 
+// Hand summary for game history
+export interface HandSummary {
+  handNumber: number;
+  winner: string;
+  winningHand: string;
+  potSize: number;
+  actions: {
+    playerName: string;
+    action: BettingAction;
+    amount?: number;
+    phase: GamePhase;
+  }[];
+  showdownHands?: {
+    playerName: string;
+    hand: string;
+  }[];
+}
+
+// Game history for AI context
+export interface GameHistory {
+  hands: HandSummary[];
+  playerStats: {
+    [playerId: string]: {
+      handsPlayed: number;
+      handsWon: number;
+      totalBet: number;
+      allInCount: number;
+      foldCount: number;
+      bluffCaught: number; // Times they went all-in with weak hand
+    };
+  };
+}
+
 // Constants
 export const STARTING_CHIPS = 1000;
 export const SMALL_BLIND = 10;
