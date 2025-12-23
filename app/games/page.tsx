@@ -18,9 +18,9 @@ const games = [
   },
   {
     name: "MOM",
-    title: "STITCH MASTER",
-    description: "Sewing and crafting challenge",
-    icon: "-*-",
+    title: "SUDOKU",
+    description: "Classic number puzzle game",
+    icon: "9#9",
     href: "/games/mom",
   },
   {
