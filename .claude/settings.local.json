@@ -8,7 +8,9 @@
       "Bash(bun run build:*)",
       "Bash(bunx tsc:*)",
       "Bash(pkill:*)",
-      "Bash(bun run dev)"
+      "Bash(bun run dev)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
