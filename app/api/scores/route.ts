@@ -21,6 +21,8 @@ export async function GET(request: NextRequest) {
     .order("score", { ascending: false })
     .limit(10);
 
+  console.log("Scores query for game:", game, "- data:", data, "error:", error);
+
   if (error) {
     console.error("Supabase error:", error);
     return NextResponse.json([]);

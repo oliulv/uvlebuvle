@@ -13,7 +13,9 @@
       "Bash(git commit:*)",
       "Bash(find:*)",
       "Bash(bun dev)",
-      "Bash(bun i:*)"
+      "Bash(bun i:*)",
+      "Bash(cat:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []

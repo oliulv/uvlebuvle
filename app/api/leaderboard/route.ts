@@ -17,6 +17,8 @@ export async function GET() {
     .from("normalized_points")
     .select("player, base_points, bonus_points");
 
+  console.log("Leaderboard query - data:", data, "error:", error);
+
   if (error) {
     console.error("Supabase error:", error);
     return NextResponse.json([]);
